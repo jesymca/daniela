@@ -1,0 +1,29 @@
+<?php
+// modules/inventario/eliminar.php - Eliminar producto
+
+require_once '../../config.php';
+
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../../login.php');
+    exit;
+}
+$id = $_GET['id'] ?? null;
+if (!$id) {
+    header('Location: listar.php');
+    exit;
+}
+
+try {
+    $stmt = $pdo->prepare("DELETE FROM productos WHERE id=?");
+    $stmt->execute([$id]);
+    header('Location: listar.php');
+    exit;
+} catch (PDOException $e) {
+    die("Error al eliminar producto: " . $e->getMessage());
+}
+?>

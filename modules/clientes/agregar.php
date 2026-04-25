@@ -1,0 +1,61 @@
+<?php
+// modules/clientes/agregar.php - Agregar nuevo cliente
+
+require_once '../../config.php';
+
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../../login.php');
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $nombre = $_POST['nombre'];
+    $email = $_POST['email'];
+    $telefono = $_POST['telefono'];
+    $direccion = $_POST['direccion'];
+
+    try {
+        $stmt = $pdo->prepare("INSERT INTO clientes (nombre, email, telefono, direccion) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$nombre, $email, $telefono, $direccion]);
+        header('Location: listar.php');
+        exit;
+    } catch (PDOException $e) {
+        $error = "Error al agregar cliente: " . $e->getMessage();
+    }
+}
+
+include '../../header.php';
+?>
+
+<div class="container mt-4">
+    <h2><i class="fas fa-plus"></i> Agregar Cliente</h2>
+    <?php if (isset($error)): ?>
+        <div class="alert alert-danger"><?php echo $error; ?></div>
+    <?php endif; ?>
+    <form method="post">
+        <div class="mb-3">
+            <label for="nombre" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="nombre" name="nombre" required>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="email" name="email">
+        </div>
+        <div class="mb-3">
+            <label for="telefono" class="form-label">Teléfono</label>
+            <input type="text" class="form-control" id="telefono" name="telefono">
+        </div>
+        <div class="mb-3">
+            <label for="direccion" class="form-label">Dirección</label>
+            <textarea class="form-control" id="direccion" name="direccion"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+        <a href="listar.php" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+
+<?php include '../../footer.php'; ?>
