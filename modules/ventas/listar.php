@@ -391,35 +391,51 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('total').textContent = total.toFixed(2);
     }
 
-    // Búsqueda de clientes
+    // Búsqueda de clientes con soporte flexible para Nombre y Cédula/RIF
     const clienteSearch = document.getElementById('cliente_search');
     const clienteSuggestions = document.getElementById('cliente_suggestions');
     const clienteId = document.getElementById('cliente_id');
     const allClientes = Array.from(clienteId.options).slice(1); // Excluir la primera opción vacía
 
-    clienteSearch.addEventListener('input', function() {
-        const query = this.value.toLowerCase();
-        clienteSuggestions.innerHTML = '';
-        if (query.length > 0) {
-            const filtered = allClientes.filter(option => 
-                option.textContent.toLowerCase().includes(query) ||
-                option.getAttribute('data-rif').toLowerCase().includes(query)
-            );
-            filtered.forEach(option => {
-                const item = document.createElement('a');
-                item.className = 'list-group-item list-group-item-action';
-                item.href = '#';
-                item.textContent = option.textContent;
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    clienteSearch.value = option.getAttribute('data-nombre') + ' (' + option.getAttribute('data-rif') + ')';
-                    clienteId.value = option.value;
-                    clienteSuggestions.innerHTML = '';
+    if (clienteSearch && clienteSuggestions && clienteId) {
+        clienteSearch.addEventListener('input', function() {
+            const queryRaw = this.value.toLowerCase().trim();
+            const queryAlphaNum = queryRaw.replace(/[^0-9a-z]/g, '');
+            const queryDigits = queryRaw.replace(/[^0-9]/g, '');
+
+            clienteSuggestions.innerHTML = '';
+            if (queryRaw.length > 0) {
+                const filtered = allClientes.filter(option => {
+                    const nombre = (option.getAttribute('data-nombre') || option.textContent).toLowerCase();
+                    const rif = (option.getAttribute('data-rif') || '').toLowerCase();
+
+                    if (nombre.includes(queryRaw) || rif.includes(queryRaw)) return true;
+
+                    const rifAlphaNum = rif.replace(/[^0-9a-z]/g, '');
+                    if (queryAlphaNum && rifAlphaNum.includes(queryAlphaNum)) return true;
+
+                    const rifDigits = rif.replace(/[^0-9]/g, '');
+                    if (queryDigits && rifDigits.includes(queryDigits)) return true;
+
+                    return false;
                 });
-                clienteSuggestions.appendChild(item);
-            });
-        }
-    });
+
+                filtered.forEach(option => {
+                    const item = document.createElement('a');
+                    item.className = 'list-group-item list-group-item-action';
+                    item.href = '#';
+                    item.textContent = option.textContent;
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        clienteSearch.value = option.getAttribute('data-nombre') + ' (' + option.getAttribute('data-rif') + ')';
+                        clienteId.value = option.value;
+                        clienteSuggestions.innerHTML = '';
+                    });
+                    clienteSuggestions.appendChild(item);
+                });
+            }
+        });
+    }
     var detallesVentaModal = document.getElementById('detallesVentaModal');
     if (detallesVentaModal) {
         detallesVentaModal.addEventListener('show.bs.modal', function (event) {

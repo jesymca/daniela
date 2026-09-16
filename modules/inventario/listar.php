@@ -176,17 +176,42 @@ try {
 include '../../header.php';
 ?>
 
-<div class="container mt-4">
-    <h2><i class="fas fa-boxes"></i> Inventario de Productos</h2>
-    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#agregarProductoModal">
-        <i class="fas fa-plus"></i> Agregar Producto
-    </button>
+<div class="container mt-4 mb-5">
+    <div class="row align-items-center mb-3">
+        <div class="col-md-6">
+            <h2 class="mb-0"><i class="fas fa-boxes text-primary me-2"></i> Inventario de Productos</h2>
+        </div>
+        <div class="col-md-6 text-md-end mt-2 mt-md-0">
+            <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#agregarProductoModal">
+                <i class="fas fa-plus me-1"></i> Agregar Producto
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de Búsqueda en Tiempo Real para Productos -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-primary text-white"><i class="fas fa-search"></i></span>
+                <input type="text" id="buscarProductoInput" class="form-control" placeholder="Buscar por Nombre, Proveedor, Categoría o Descripción en tiempo real...">
+                <button type="button" class="btn btn-outline-secondary" id="limpiarBusquedaProducto" title="Limpiar filtro">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i><?php echo htmlspecialchars($error); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
     <?php if ($success): ?>
-        <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($success); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
 
     <div class="table-responsive">
@@ -501,6 +526,69 @@ include '../../header.php';
                 document.getElementById('eliminarProductoId').value = id;
                 document.getElementById('eliminarProductoNombre').textContent = nombre;
             });
+        }
+
+        /**
+         * ====================================================================
+         * FILTRADO EN TIEMPO REAL: Productos (Nombre, Proveedor, Categoría, Descripción)
+         * ====================================================================
+         */
+        var buscarInput = document.getElementById('buscarProductoInput');
+        var limpiarBtn = document.getElementById('limpiarBusquedaProducto');
+        var tablaProductos = document.querySelector('.table-responsive table');
+
+        if (buscarInput && tablaProductos) {
+            var tbody = tablaProductos.querySelector('tbody');
+            var filas = tbody ? tbody.querySelectorAll('tr') : [];
+
+            function filtrarProductos() {
+                var query = buscarInput.value.toLowerCase().trim();
+                var visibles = 0;
+
+                filas.forEach(function(row) {
+                    if (row.id === 'noProductosRow') return;
+
+                    var ctds = row.querySelectorAll('td');
+                    if (ctds.length < 6) return;
+
+                    var codigo = (ctds[1].textContent || '').toLowerCase();
+                    var nombre = (ctds[2].textContent || '').toLowerCase();
+                    var proveedor = (ctds[3].textContent || '').toLowerCase();
+                    var categoria = (ctds[4].textContent || '').toLowerCase();
+                    var descripcion = (ctds[5].textContent || '').toLowerCase();
+
+                    if (!query || nombre.includes(query) || proveedor.includes(query) || categoria.includes(query) || descripcion.includes(query) || codigo.includes(query)) {
+                        row.style.display = '';
+                        visibles++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                var noRow = document.getElementById('noProductosRow');
+                if (visibles === 0 && query !== '') {
+                    if (!noRow) {
+                        noRow = document.createElement('tr');
+                        noRow.id = 'noProductosRow';
+                        noRow.innerHTML = '<td colspan="9" class="text-center text-muted py-4"><i class="fas fa-search me-2 text-warning"></i>No se encontraron productos que coincidan con "<strong>' + document.createTextNode(buscarInput.value).textContent + '</strong>".</td>';
+                        tbody.appendChild(noRow);
+                    } else {
+                        noRow.style.display = '';
+                        noRow.querySelector('td').innerHTML = '<i class="fas fa-search me-2 text-warning"></i>No se encontraron productos que coincidan con "<strong>' + document.createTextNode(buscarInput.value).textContent + '</strong>".';
+                    }
+                } else if (noRow) {
+                    noRow.style.display = 'none';
+                }
+            }
+
+            buscarInput.addEventListener('input', filtrarProductos);
+            if (limpiarBtn) {
+                limpiarBtn.addEventListener('click', function() {
+                    buscarInput.value = '';
+                    filtrarProductos();
+                    buscarInput.focus();
+                });
+            }
         }
     });
 </script>

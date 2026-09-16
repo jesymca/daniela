@@ -75,17 +75,42 @@ try {
 include '../../header.php';
 ?>
 
-<div class="container mt-4">
-    <h2><i class="fas fa-users"></i> Gestión de Clientes</h2>
-    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#agregarClienteModal">
-        <i class="fas fa-plus"></i> Agregar Cliente
-    </button>
+<div class="container mt-4 mb-5">
+    <div class="row align-items-center mb-3">
+        <div class="col-md-6">
+            <h2 class="mb-0"><i class="fas fa-users text-primary me-2"></i> Gestión de Clientes</h2>
+        </div>
+        <div class="col-md-6 text-md-end mt-2 mt-md-0">
+            <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#agregarClienteModal">
+                <i class="fas fa-plus me-1"></i> Agregar Cliente
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de Búsqueda en Tiempo Real para Clientes -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-primary text-white"><i class="fas fa-search"></i></span>
+                <input type="text" id="buscarClienteInput" class="form-control" placeholder="Buscar por Nombre o Cédula/RIF en tiempo real (ej: V-12545222 o solo 12545222)...">
+                <button type="button" class="btn btn-outline-secondary" id="limpiarBusquedaCliente" title="Limpiar filtro">
+                    <i class="fas fa-times"></i> Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i><?php echo htmlspecialchars($error); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
     <?php if ($success): ?>
-        <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($success); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
 
     <div class="table-responsive">
@@ -291,6 +316,93 @@ include '../../header.php';
                 document.getElementById('eliminarClienteId').value = id;
                 document.getElementById('eliminarClienteNombre').textContent = nombre;
             });
+        }
+
+        /**
+         * ====================================================================
+         * FILTRADO EN TIEMPO REAL: Clientes (Nombre y Cédula/RIF Flexible)
+         * ====================================================================
+         * Permite búsquedas completas (ej. V-12545222), sin prefijo (ej. 12545222)
+         * o por nombre de cliente.
+         */
+        var buscarClienteInput = document.getElementById('buscarClienteInput');
+        var limpiarClienteBtn = document.getElementById('limpiarBusquedaCliente');
+        var tablaClientes = document.querySelector('.table-responsive table');
+
+        if (buscarClienteInput && tablaClientes) {
+            var tbodyClientes = tablaClientes.querySelector('tbody');
+            var filasClientes = tbodyClientes ? tbodyClientes.querySelectorAll('tr') : [];
+
+            function filtrarClientes() {
+                var queryRaw = buscarClienteInput.value.toLowerCase().trim();
+                var queryAlphaNum = queryRaw.replace(/[^0-9a-z]/g, '');
+                var queryDigits = queryRaw.replace(/[^0-9]/g, '');
+                var visibles = 0;
+
+                filasClientes.forEach(function(row) {
+                    if (row.id === 'noClientesRow') return;
+
+                    var ctds = row.querySelectorAll('td');
+                    if (ctds.length < 4) return;
+
+                    var rifCedulaRaw = (ctds[2].textContent || '').trim();
+                    var nombreRaw = (ctds[3].textContent || '').trim();
+
+                    var rifLower = rifCedulaRaw.toLowerCase();
+                    var nombreLower = nombreRaw.toLowerCase();
+
+                    var isMatch = false;
+
+                    if (!queryRaw) {
+                        isMatch = true;
+                    } else if (nombreLower.includes(queryRaw) || rifLower.includes(queryRaw)) {
+                        isMatch = true;
+                    } else {
+                        // Comparar limpiando caracteres especiales (V-12545222 -> v12545222)
+                        var rifAlphaNum = rifLower.replace(/[^0-9a-z]/g, '');
+                        if (queryAlphaNum && rifAlphaNum.includes(queryAlphaNum)) {
+                            isMatch = true;
+                        } else {
+                            // Comparar solo dígitos (V-12545222 -> 12545222)
+                            var rifDigits = rifLower.replace(/[^0-9]/g, '');
+                            if (queryDigits && rifDigits.includes(queryDigits)) {
+                                isMatch = true;
+                            }
+                        }
+                    }
+
+                    if (isMatch) {
+                        row.style.display = '';
+                        visibles++;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                var noRow = document.getElementById('noClientesRow');
+                if (visibles === 0 && queryRaw !== '') {
+                    if (!noRow) {
+                        noRow = document.createElement('tr');
+                        noRow.id = 'noClientesRow';
+                        noRow.innerHTML = '<td colspan="8" class="text-center text-muted py-4"><i class="fas fa-search me-2 text-warning"></i>No se encontraron clientes que coincidan con "<strong>' + document.createTextNode(buscarClienteInput.value).textContent + '</strong>".</td>';
+                        tbodyClientes.appendChild(noRow);
+                    } else {
+                        noRow.style.display = '';
+                        noRow.querySelector('td').innerHTML = '<i class="fas fa-search me-2 text-warning"></i>No se encontraron clientes que coincidan con "<strong>' + document.createTextNode(buscarClienteInput.value).textContent + '</strong>".';
+                    }
+                } else if (noRow) {
+                    noRow.style.display = 'none';
+                }
+            }
+
+            buscarClienteInput.addEventListener('input', filtrarClientes);
+            if (limpiarClienteBtn) {
+                limpiarClienteBtn.addEventListener('click', function() {
+                    buscarClienteInput.value = '';
+                    filtrarClientes();
+                    buscarClienteInput.focus();
+                });
+            }
         }
     });
 </script>
