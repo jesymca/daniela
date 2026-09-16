@@ -27,10 +27,12 @@ CREATE TABLE productos (
     descripcion TEXT,
     precio DECIMAL(10,2) NOT NULL,
     stock INT NOT NULL DEFAULT 0,
+    proveedor_id INT DEFAULT NULL,
     categoria_id INT DEFAULT NULL,
     codigo_barras VARCHAR(100) UNIQUE,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE SET NULL
+    FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE SET NULL,
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
 );
 
 -- Tabla de clientes

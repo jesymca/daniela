@@ -15,6 +15,15 @@ if (!isset($_SESSION['user_id'])) {
 $error = '';
 $success = '';
 
+// Detectar si la columna proveedor_id existe en productos
+$productosTieneProveedorId = false;
+try {
+    $stmt = $pdo->query("SHOW COLUMNS FROM productos LIKE 'proveedor_id'");
+    $productosTieneProveedorId = (bool) $stmt->fetch();
+} catch (PDOException $e) {
+    $productosTieneProveedorId = false;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'add_category') {
         $categoria_nombre = trim($_POST['categoria_nombre'] ?? '');
@@ -49,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $precio = $_POST['precio'] ?? '';
         $stock = $_POST['stock'] ?? '';
         $categoria_id = $_POST['categoria_id'] ?? null;
+        $proveedor_id = $_POST['proveedor_id'] ?? null;
         $codigo_barras = trim($_POST['codigo_barras'] ?? '');
 
         if ($id <= 0) {
@@ -61,8 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'El stock debe ser un número positivo.';
         } else {
             try {
-                $stmt = $pdo->prepare('UPDATE productos SET nombre = ?, descripcion = ?, precio = ?, stock = ?, categoria_id = ?, codigo_barras = ? WHERE id = ?');
-                $stmt->execute([$nombre, $descripcion, $precio, $stock, $categoria_id ?: null, $codigo_barras ?: null, $id]);
+                if ($productosTieneProveedorId) {
+                    $stmt = $pdo->prepare('UPDATE productos SET nombre = ?, descripcion = ?, precio = ?, stock = ?, proveedor_id = ?, categoria_id = ?, codigo_barras = ? WHERE id = ?');
+                    $stmt->execute([$nombre, $descripcion, $precio, $stock, $proveedor_id ?: null, $categoria_id ?: null, $codigo_barras ?: null, $id]);
+                } else {
+                    $stmt = $pdo->prepare('UPDATE productos SET nombre = ?, descripcion = ?, precio = ?, stock = ?, categoria_id = ?, codigo_barras = ? WHERE id = ?');
+                    $stmt->execute([$nombre, $descripcion, $precio, $stock, $categoria_id ?: null, $codigo_barras ?: null, $id]);
+                }
                 $success = 'Producto actualizado correctamente.';
             } catch (PDOException $e) {
                 $error = 'Error al actualizar el producto: ' . $e->getMessage();
@@ -87,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $precio = $_POST['precio'] ?? '';
         $stock = $_POST['stock'] ?? '';
         $categoria_id = $_POST['categoria_id'] ?? null;
+        $proveedor_id = $_POST['proveedor_id'] ?? null;
         $codigo_barras = trim($_POST['codigo_barras'] ?? '');
 
         if ($nombre === '' || $precio === '' || $stock === '') {
@@ -97,8 +113,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'El stock debe ser un número positivo.';
         } else {
             try {
-                $stmt = $pdo->prepare('INSERT INTO productos (nombre, descripcion, precio, stock, categoria_id, codigo_barras) VALUES (?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$nombre, $descripcion, $precio, $stock, $categoria_id ?: null, $codigo_barras ?: null]);
+                if ($productosTieneProveedorId) {
+                    $stmt = $pdo->prepare('INSERT INTO productos (nombre, descripcion, precio, stock, proveedor_id, categoria_id, codigo_barras) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                    $stmt->execute([$nombre, $descripcion, $precio, $stock, $proveedor_id ?: null, $categoria_id ?: null, $codigo_barras ?: null]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO productos (nombre, descripcion, precio, stock, categoria_id, codigo_barras) VALUES (?, ?, ?, ?, ?, ?)');
+                    $stmt->execute([$nombre, $descripcion, $precio, $stock, $categoria_id ?: null, $codigo_barras ?: null]);
+                }
                 $success = 'Producto agregado correctamente.';
             } catch (PDOException $e) {
                 $error = 'Error al agregar el producto: ' . $e->getMessage();
@@ -114,8 +135,39 @@ try {
     die('Error al consultar categorías: ' . $e->getMessage());
 }
 
+// Obtener proveedores para formulario
 try {
-    $stmt = $pdo->query('SELECT p.*, c.nombre AS categoria_nombre FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id ORDER BY p.nombre ASC');
+    $stmt = $pdo->query('SELECT id, nombre FROM proveedores ORDER BY nombre ASC');
+    $proveedores = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $proveedores = [];
+}
+
+try {
+    if ($productosTieneProveedorId) {
+        $sql = "SELECT p.*, c.nombre AS categoria_nombre,
+            COALESCE(pr.nombre,
+            (SELECT pr2.nombre FROM compras_detalles cd
+                JOIN compras co ON cd.compra_id = co.id
+                JOIN proveedores pr2 ON co.proveedor_id = pr2.id
+                WHERE cd.producto_id = p.id AND co.proveedor_id IS NOT NULL
+                ORDER BY co.fecha DESC LIMIT 1)) AS proveedor_nombre
+            FROM productos p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            LEFT JOIN proveedores pr ON p.proveedor_id = pr.id
+            ORDER BY p.nombre ASC";
+    } else {
+        $sql = "SELECT p.*, c.nombre AS categoria_nombre,
+            (SELECT pr2.nombre FROM compras_detalles cd
+                JOIN compras co ON cd.compra_id = co.id
+                JOIN proveedores pr2 ON co.proveedor_id = pr2.id
+                WHERE cd.producto_id = p.id AND co.proveedor_id IS NOT NULL
+                ORDER BY co.fecha DESC LIMIT 1) AS proveedor_nombre
+            FROM productos p
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            ORDER BY p.nombre ASC";
+    }
+    $stmt = $pdo->query($sql);
     $productos = $stmt->fetchAll();
 } catch (PDOException $e) {
     die("Error al consultar productos: " . $e->getMessage());
@@ -144,6 +196,7 @@ include '../../header.php';
                     <th>ID</th>
                     <th>Código de Barras</th>
                     <th>Nombre</th>
+                    <th>Proveedor</th>
                     <th>Categoría</th>
                     <th>Descripción</th>
                     <th>Precio</th>
@@ -157,6 +210,7 @@ include '../../header.php';
                     <td><?php echo $producto['id']; ?></td>
                     <td><?php echo htmlspecialchars($producto['codigo_barras']); ?></td>
                     <td><?php echo htmlspecialchars($producto['nombre']); ?></td>
+                    <td><?php echo htmlspecialchars($producto['proveedor_nombre'] ?? 'Sin proveedor'); ?></td>
                     <td><?php echo htmlspecialchars($producto['categoria_nombre'] ?? 'Sin categoría'); ?></td>
                     <td><?php echo htmlspecialchars($producto['descripcion']); ?></td>
                     <td>$<?php echo number_format($producto['precio'], 2); ?></td>
@@ -166,6 +220,7 @@ include '../../header.php';
                             data-id="<?php echo $producto['id']; ?>"
                             data-codigo="<?php echo htmlspecialchars($producto['codigo_barras'], ENT_QUOTES); ?>"
                             data-nombre="<?php echo htmlspecialchars($producto['nombre'], ENT_QUOTES); ?>"
+                            data-proveedor="<?php echo intval($producto['proveedor_id'] ?? 0); ?>"
                             data-categoria="<?php echo intval($producto['categoria_id']); ?>"
                             data-descripcion="<?php echo htmlspecialchars($producto['descripcion'], ENT_QUOTES); ?>"
                             data-precio="<?php echo htmlspecialchars($producto['precio'], ENT_QUOTES); ?>"
@@ -259,6 +314,19 @@ include '../../header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php if ($productosTieneProveedorId): ?>
+                    <div class="mb-3">
+                        <label for="proveedor_id" class="form-label">Proveedor</label>
+                        <select class="form-control" id="proveedor_id" name="proveedor_id">
+                            <option value="">Sin proveedor</option>
+                            <?php foreach ($proveedores as $prov): ?>
+                                <option value="<?php echo $prov['id']; ?>"><?php echo htmlspecialchars($prov['nombre']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-warning">La base de datos no tiene la columna <code>proveedor_id</code> en <code>productos</code>. Ejecuta la migración para habilitar la asignación de proveedor.</div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label for="precio" class="form-label">Precio *</label>
                         <input type="number" class="form-control" id="precio" name="precio" step="0.01" min="0" required>
@@ -339,6 +407,19 @@ include '../../header.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <?php if ($productosTieneProveedorId): ?>
+                    <div class="mb-3">
+                        <label for="editarProveedorId" class="form-label">Proveedor</label>
+                        <select class="form-control" id="editarProveedorId" name="proveedor_id">
+                            <option value="">Sin proveedor</option>
+                            <?php foreach ($proveedores as $prov): ?>
+                                <option value="<?php echo $prov['id']; ?>"><?php echo htmlspecialchars($prov['nombre']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert alert-warning">La base de datos no tiene la columna <code>proveedor_id</code> en <code>productos</code>. Ejecuta la migración para habilitar la asignación de proveedor.</div>
+                    <?php endif; ?>
                     <div class="mb-3">
                         <label for="editarPrecio" class="form-label">Precio *</label>
                         <input type="number" class="form-control" id="editarPrecio" name="precio" step="0.01" min="0" required>
@@ -390,6 +471,7 @@ include '../../header.php';
                 var id = button.getAttribute('data-id');
                 var codigo = button.getAttribute('data-codigo');
                 var nombre = button.getAttribute('data-nombre');
+                var proveedor = button.getAttribute('data-proveedor');
                 var categoria = button.getAttribute('data-categoria');
                 var descripcion = button.getAttribute('data-descripcion');
                 var precio = button.getAttribute('data-precio');
@@ -398,6 +480,10 @@ include '../../header.php';
                 document.getElementById('editarProductoId').value = id;
                 document.getElementById('editarCodigoBarras').value = codigo;
                 document.getElementById('editarNombre').value = nombre;
+                const editarProveedorSelect = document.getElementById('editarProveedorId');
+                if (editarProveedorSelect) {
+                    editarProveedorSelect.value = proveedor || '';
+                }
                 document.getElementById('editarCategoriaId').value = categoria;
                 document.getElementById('editarDescripcion').value = descripcion;
                 document.getElementById('editarPrecio').value = precio;

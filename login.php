@@ -50,7 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="row justify-content-center">
             <div class="col-md-6 col-lg-5">
                 <div class="card shadow-sm">
-                    <div class="card-body">
+                    <div class="card-body text-center">
+                        <img src="./image/logo_m.jpeg" alt="Logo Michele C.A." class="img-fluid mb-3" style="max-height: 180px; object-fit: contain;">
                         <h2 class="card-title text-center mb-4">Iniciar Sesión</h2>
 
                         <?php if ($error): ?>

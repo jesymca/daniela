@@ -17,27 +17,29 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'add';
+    $tipo = trim($_POST['tipo'] ?? 'persona');
+    $rif_cedula = trim($_POST['rif_cedula'] ?? '');
     $nombre = trim($_POST['nombre'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $telefono = trim($_POST['telefono'] ?? '');
     $direccion = trim($_POST['direccion'] ?? '');
 
     if ($action === 'add' || $action === 'edit') {
-        if ($nombre === '') {
-            $error = 'El nombre es obligatorio.';
+        if ($tipo === '' || $rif_cedula === '' || $nombre === '') {
+            $error = 'Tipo, RIF/Cédula y nombre son obligatorios.';
         } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'El correo electrónico no es válido.';
         } else {
             try {
                 if ($action === 'add') {
-                    $stmt = $pdo->prepare('INSERT INTO proveedores (nombre, email, telefono, direccion) VALUES (?, ?, ?, ?)');
-                    $stmt->execute([$nombre, $email, $telefono, $direccion]);
+                    $stmt = $pdo->prepare('INSERT INTO proveedores (tipo, rif_cedula, nombre, email, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)');
+                    $stmt->execute([$tipo, $rif_cedula, $nombre, $email, $telefono, $direccion]);
                     $success = 'Proveedor agregado correctamente.';
                 } else {
                     $id = intval($_POST['id'] ?? 0);
                     if ($id > 0) {
-                        $stmt = $pdo->prepare('UPDATE proveedores SET nombre = ?, email = ?, telefono = ?, direccion = ? WHERE id = ?');
-                        $stmt->execute([$nombre, $email, $telefono, $direccion, $id]);
+                        $stmt = $pdo->prepare('UPDATE proveedores SET tipo = ?, rif_cedula = ?, nombre = ?, email = ?, telefono = ?, direccion = ? WHERE id = ?');
+                        $stmt->execute([$tipo, $rif_cedula, $nombre, $email, $telefono, $direccion, $id]);
                         $success = 'Proveedor actualizado correctamente.';
                     } else {
                         $error = 'ID de proveedor inválido para edición.';
@@ -91,6 +93,8 @@ include '../../header.php';
             <thead>
                 <tr>
                     <th>ID</th>
+                    <th>Tipo</th>
+                    <th>RIF/Cédula</th>
                     <th>Nombre</th>
                     <th>Email</th>
                     <th>Teléfono</th>
@@ -102,6 +106,8 @@ include '../../header.php';
                 <?php foreach ($proveedores as $proveedor): ?>
                 <tr>
                     <td><?php echo $proveedor['id']; ?></td>
+                    <td><?php echo htmlspecialchars(ucfirst($proveedor['tipo'] ?? 'persona')); ?></td>
+                    <td><?php echo htmlspecialchars($proveedor['rif_cedula'] ?? ''); ?></td>
                     <td><?php echo htmlspecialchars($proveedor['nombre']); ?></td>
                     <td><?php echo htmlspecialchars($proveedor['email']); ?></td>
                     <td><?php echo htmlspecialchars($proveedor['telefono']); ?></td>
@@ -109,6 +115,8 @@ include '../../header.php';
                     <td>
                         <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editarProveedorModal"
                             data-id="<?php echo $proveedor['id']; ?>"
+                            data-tipo="<?php echo htmlspecialchars($proveedor['tipo'] ?? 'persona', ENT_QUOTES); ?>"
+                            data-rif_cedula="<?php echo htmlspecialchars($proveedor['rif_cedula'] ?? '', ENT_QUOTES); ?>"
                             data-nombre="<?php echo htmlspecialchars($proveedor['nombre'], ENT_QUOTES); ?>"
                             data-email="<?php echo htmlspecialchars($proveedor['email'], ENT_QUOTES); ?>"
                             data-telefono="<?php echo htmlspecialchars($proveedor['telefono'], ENT_QUOTES); ?>"
@@ -139,6 +147,17 @@ include '../../header.php';
             <form method="post" action="">
                 <input type="hidden" name="action" value="add">
                 <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="tipo" class="form-label">Tipo *</label>
+                        <select class="form-control" id="tipo" name="tipo" required>
+                            <option value="persona">Persona</option>
+                            <option value="empresa">Empresa</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rif_cedula" class="form-label">RIF / Cédula *</label>
+                        <input type="text" class="form-control" id="rif_cedula" name="rif_cedula" required placeholder="V-12345678 o J-123456789">
+                    </div>
                     <div class="mb-3">
                         <label for="nombre" class="form-label">Nombre *</label>
                         <input type="text" class="form-control" id="nombre" name="nombre" required>
@@ -177,6 +196,17 @@ include '../../header.php';
                 <input type="hidden" name="action" value="edit">
                 <input type="hidden" id="editarProveedorId" name="id" value="">
                 <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editarTipo" class="form-label">Tipo *</label>
+                        <select class="form-control" id="editarTipo" name="tipo" required>
+                            <option value="persona">Persona</option>
+                            <option value="empresa">Empresa</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editarRifCedula" class="form-label">RIF / Cédula *</label>
+                        <input type="text" class="form-control" id="editarRifCedula" name="rif_cedula" required placeholder="V-12345678 o J-123456789">
+                    </div>
                     <div class="mb-3">
                         <label for="editarNombre" class="form-label">Nombre *</label>
                         <input type="text" class="form-control" id="editarNombre" name="nombre" required>
@@ -234,12 +264,16 @@ include '../../header.php';
             editarProveedorModal.addEventListener('show.bs.modal', function (event) {
                 var button = event.relatedTarget;
                 var id = button.getAttribute('data-id');
+                var tipo = button.getAttribute('data-tipo');
+                var rifCedula = button.getAttribute('data-rif_cedula');
                 var nombre = button.getAttribute('data-nombre');
                 var email = button.getAttribute('data-email');
                 var telefono = button.getAttribute('data-telefono');
                 var direccion = button.getAttribute('data-direccion');
 
                 document.getElementById('editarProveedorId').value = id;
+                document.getElementById('editarTipo').value = tipo;
+                document.getElementById('editarRifCedula').value = rifCedula;
                 document.getElementById('editarNombre').value = nombre;
                 document.getElementById('editarEmail').value = email;
                 document.getElementById('editarTelefono').value = telefono;

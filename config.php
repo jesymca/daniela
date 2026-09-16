@@ -13,4 +13,12 @@ try {
 } catch (PDOException $e) {
     die("Error de conexión: " . $e->getMessage());
 }
+
+// Ruta base dinámica: devuelve la carpeta base de la aplicación (ej. '/daniela')
+$scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+$basePath = rtrim(dirname($scriptName), '/\\');
+if ($basePath === '' || $basePath === '.') {
+    $basePath = '';
+}
+define('BASE_PATH', $basePath);
 ?>

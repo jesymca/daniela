@@ -1,5 +1,5 @@
 <?php
-// modules/ventas/nueva.php - Nueva venta
+// modules/ventas/nueva.php - Nueva venta (Punto de Venta)
 
 require_once '../../config.php';
 
@@ -25,24 +25,46 @@ try {
     die("Error al consultar datos: " . $e->getMessage());
 }
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// Procesar creación de cliente
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['crear_cliente'])) {
+    $nombre = trim($_POST['cliente_nombre']);
+    $email = trim($_POST['cliente_email']);
+    $telefono = trim($_POST['cliente_telefono']);
+    $direccion = trim($_POST['cliente_direccion']);
+
+    if (empty($nombre)) {
+        $error_cliente = "El nombre del cliente es obligatorio.";
+    } else {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO clientes (nombre, email, telefono, direccion) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$nombre, $email, $telefono, $direccion]);
+            $nuevo_cliente_id = $pdo->lastInsertId();
+            // Recargar clientes
+            $stmt = $pdo->query("SELECT id, nombre FROM clientes ORDER BY nombre ASC");
+            $clientes = $stmt->fetchAll();
+            $success_cliente = "Cliente creado exitosamente.";
+        } catch (PDOException $e) {
+            $error_cliente = "Error al crear cliente: " . $e->getMessage();
+        }
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['productos'])) {
     $cliente_id = $_POST['cliente_id'];
     $productos_seleccionados = $_POST['productos'] ?? [];
     $cantidades = $_POST['cantidades'] ?? [];
 
     if (empty($productos_seleccionados)) {
         $error = "Debe seleccionar al menos un producto.";
+    } elseif (empty($cliente_id)) {
+        $error = "Debe seleccionar un cliente.";
     } else {
         try {
             $pdo->beginTransaction();
-            $total = 0;
+            $subtotal = 0;
+            $iva_tasa = 0.16; // IVA Venezuela 16%
 
-            // Insertar venta
-            $stmt = $pdo->prepare("INSERT INTO ventas (cliente_id, total) VALUES (?, 0)");
-            $stmt->execute([$cliente_id]);
-            $venta_id = $pdo->lastInsertId();
-
-            // Insertar detalles y calcular total
+            // Calcular subtotal
             foreach ($productos_seleccionados as $index => $producto_id) {
                 $cantidad = $cantidades[$index];
                 if ($cantidad <= 0) continue;
@@ -52,23 +74,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $producto = $stmt->fetch();
 
                 if ($producto && $producto['stock'] >= $cantidad) {
-                    $subtotal = $producto['precio'] * $cantidad;
-                    $total += $subtotal;
-
-                    $stmt = $pdo->prepare("INSERT INTO ventas_detalles (venta_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)");
-                    $stmt->execute([$venta_id, $producto_id, $cantidad, $producto['precio']]);
-
-                    // Descontar stock
-                    $stmt = $pdo->prepare("UPDATE productos SET stock = stock - ? WHERE id = ?");
-                    $stmt->execute([$cantidad, $producto_id]);
+                    $subtotal += $producto['precio'] * $cantidad;
                 } else {
                     throw new Exception("Stock insuficiente para el producto ID $producto_id");
                 }
             }
 
-            // Actualizar total de la venta
-            $stmt = $pdo->prepare("UPDATE ventas SET total = ? WHERE id = ?");
-            $stmt->execute([$total, $venta_id]);
+            $iva = $subtotal * $iva_tasa;
+            $total = $subtotal + $iva;
+
+            // Insertar venta
+            $stmt = $pdo->prepare("INSERT INTO ventas (cliente_id, subtotal, iva, total) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$cliente_id, $subtotal, $iva, $total]);
+            $venta_id = $pdo->lastInsertId();
+
+            // Insertar detalles
+            foreach ($productos_seleccionados as $index => $producto_id) {
+                $cantidad = $cantidades[$index];
+                if ($cantidad <= 0) continue;
+
+                $stmt = $pdo->prepare("SELECT precio FROM productos WHERE id = ?");
+                $stmt->execute([$producto_id]);
+                $producto = $stmt->fetch();
+
+                $stmt = $pdo->prepare("INSERT INTO ventas_detalles (venta_id, producto_id, cantidad, precio_unitario) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$venta_id, $producto_id, $cantidad, $producto['precio']]);
+
+                // Descontar stock
+                $stmt = $pdo->prepare("UPDATE productos SET stock = stock - ? WHERE id = ?");
+                $stmt->execute([$cantidad, $producto_id]);
+            }
 
             $pdo->commit();
             header('Location: listar.php');
@@ -84,19 +119,28 @@ include '../../header.php';
 ?>
 
 <div class="container mt-4">
-    <h2><i class="fas fa-plus"></i> Nueva Venta</h2>
+    <h2><i class="fas fa-plus"></i> Nueva Venta (Punto de Venta)</h2>
     <?php if (isset($error)): ?>
         <div class="alert alert-danger"><?php echo $error; ?></div>
+    <?php endif; ?>
+    <?php if (isset($error_cliente)): ?>
+        <div class="alert alert-danger"><?php echo $error_cliente; ?></div>
+    <?php endif; ?>
+    <?php if (isset($success_cliente)): ?>
+        <div class="alert alert-success"><?php echo $success_cliente; ?></div>
     <?php endif; ?>
     <form method="post" id="ventaForm">
         <div class="mb-3">
             <label for="cliente_id" class="form-label">Cliente</label>
-            <select class="form-control" id="cliente_id" name="cliente_id" required>
-                <option value="">Seleccionar cliente</option>
-                <?php foreach ($clientes as $cliente): ?>
-                    <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nombre']); ?></option>
-                <?php endforeach; ?>
-            </select>
+            <div class="input-group">
+                <select class="form-control" id="cliente_id" name="cliente_id" required>
+                    <option value="">Seleccionar cliente</option>
+                    <?php foreach ($clientes as $cliente): ?>
+                        <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nombre']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#crearClienteModal"><i class="fas fa-plus"></i> Nuevo Cliente</button>
+            </div>
         </div>
 
         <h4>Productos</h4>
@@ -131,12 +175,50 @@ include '../../header.php';
         <button type="button" class="btn btn-secondary mb-3" id="addProduct"><i class="fas fa-plus"></i> Agregar Producto</button>
 
         <div class="mb-3">
+            <strong>Subtotal: $<span id="subtotal">0.00</span></strong><br>
+            <strong>IVA (16%): $<span id="iva">0.00</span></strong><br>
             <strong>Total: $<span id="total">0.00</span></strong>
         </div>
 
         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Procesar Venta</button>
         <a href="listar.php" class="btn btn-secondary">Cancelar</a>
     </form>
+</div>
+
+<!-- Modal para crear cliente -->
+<div class="modal fade" id="crearClienteModal" tabindex="-1" aria-labelledby="crearClienteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="crearClienteModalLabel">Crear Nuevo Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="cliente_nombre" class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" id="cliente_nombre" name="cliente_nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cliente_email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="cliente_email" name="cliente_email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="cliente_telefono" class="form-label">Teléfono</label>
+                        <input type="text" class="form-control" id="cliente_telefono" name="cliente_telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label for="cliente_direccion" class="form-label">Dirección</label>
+                        <textarea class="form-control" id="cliente_direccion" name="cliente_direccion"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" name="crear_cliente" class="btn btn-primary">Crear Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -192,10 +274,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateTotal() {
-        let total = 0;
+        let subtotal = 0;
         document.querySelectorAll('.subtotal-display').forEach(el => {
-            total += parseFloat(el.value) || 0;
+            subtotal += parseFloat(el.value) || 0;
         });
+        const ivaTasa = 0.16;
+        const iva = subtotal * ivaTasa;
+        const total = subtotal + iva;
+        document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+        document.getElementById('iva').textContent = iva.toFixed(2);
         document.getElementById('total').textContent = total.toFixed(2);
     }
 });

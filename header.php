@@ -36,9 +36,9 @@ if ($documentRoot && $applicationRoot) {
 </head>
 <body>
     <!-- Navegación -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-light bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="index.php"><i class="fas fa-cogs"></i> Michele C.A. Gestión</a>
+            <a class="navbar-brand" href="index.php"><img src="image/logos.png" alt="Logo" width="300"></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -54,7 +54,6 @@ if ($documentRoot && $applicationRoot) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="inventarioDropdown">
                                 <li><a class="dropdown-item" href="modules/inventario/listar.php">Ver Productos</a></li>
-                                <li><a class="dropdown-item" href="modules/inventario/agregar.php">Agregar Producto</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -63,7 +62,6 @@ if ($documentRoot && $applicationRoot) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="ventasDropdown">
                                 <li><a class="dropdown-item" href="modules/ventas/listar.php">Ver Ventas</a></li>
-                                <li><a class="dropdown-item" href="modules/ventas/listar.php">Nueva Venta</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -72,7 +70,6 @@ if ($documentRoot && $applicationRoot) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="comprasDropdown">
                                 <li><a class="dropdown-item" href="modules/compras/listar.php">Ver Compras</a></li>
-                                <li><a class="dropdown-item" href="modules/compras/listar.php">Nueva Compra</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -81,7 +78,6 @@ if ($documentRoot && $applicationRoot) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="clientesDropdown">
                                 <li><a class="dropdown-item" href="modules/clientes/listar.php">Ver Clientes</a></li>
-                                <li><a class="dropdown-item" href="modules/clientes/agregar.php">Agregar Cliente</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -90,11 +86,18 @@ if ($documentRoot && $applicationRoot) {
                             </a>
                             <ul class="dropdown-menu" aria-labelledby="proveedoresDropdown">
                                 <li><a class="dropdown-item" href="modules/proveedores/listar.php">Ver Proveedores</a></li>
-                                <li><a class="dropdown-item" href="modules/proveedores/agregar.php">Agregar Proveedor</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="modules/reportes/index.php"><i class="fas fa-chart-bar"></i> Reportes</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="otrosDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-cogs"></i> Otros
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="otrosDropdown">
+                                <li><a class="dropdown-item" href="modules/reportes/index.php">Reportes</a></li>
+                                <li><a class="dropdown-item" href="modules/otros/mantenimiento.php">Mantenimiento de Base de Datos</a></li>
+                                <li><a class="dropdown-item" href="modules/otros/about.php">Sobre El Sistema</a></li>
+                                <li><a class="dropdown-item" href="modules/otros/manual.php">Manual de Uso</a></li>
+                            </ul>
                         </li>
                     <?php endif; ?>
                 </ul>
